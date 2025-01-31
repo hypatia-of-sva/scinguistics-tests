@@ -1,11 +1,15 @@
 #include "common.h"
 
-int main(void) {
+int main(int argc, char** argv) {
+
+    if(argc < 2) die("not enough arguments!\n");
+
+    char* path = argv[1];
+    int chosen_channel = atoi(argv[2]);
 
 
-
-
-    waveform_t testform = read_amplitude_data("../open.wav", 0);
+    //waveform_t testform = read_amplitude_data("../open.wav", 0);
+    waveform_t testform = read_amplitude_data(path, chosen_channel);
 
     printf("samples/second: %i \n", testform.samples_per_second);
     printf("length: %li \n", testform.data_length);
@@ -90,7 +94,7 @@ int main(void) {
 	//InitAudioDevice(); //?? music exmpl look
 
 
-    float amp_base_x = 15.0f, amp_base_y = 300.0f, amp_max_x = 350.0f, amp_max_y = 200.0f;
+    float amp_base_x = 15.0f, amp_base_y = 350.0f, amp_max_x = 350.0f, amp_max_y = 200.0f;
     Vector2* normalized_amplitude_graph = malloc(new_len*sizeof(Vector2));
     for(int i = 0; i < new_len; i++) {
         normalized_amplitude_graph[i].x = amp_base_x + (amp_max_x/new_len)*i;
@@ -98,7 +102,7 @@ int main(void) {
     }
 
 
-    float freq_base_x = 415.0f, freq_base_y = 300.0f, freq_max_x = 350.0f, freq_max_y = 200.0f;
+    float freq_base_x = 415.0f, freq_base_y = 350.0f, freq_max_x = 350.0f, freq_max_y = 200.0f;
     Vector2* normalized_freuquency_graph = malloc(new_len*sizeof(Vector2));
     for(int i = 0; i < new_len; i++) {
         normalized_freuquency_graph[i].x = freq_base_x + (freq_max_x/new_len)*i;
@@ -108,7 +112,11 @@ int main(void) {
 	while(!WindowShouldClose()) {
 		BeginDrawing();
 			ClearBackground(RAYWHITE);
-			DrawText("Amplitudes", 50, 20, 20, BLACK);
+
+			DrawText("Analyzing File: ", 50, 20, 20, BLACK);
+			DrawText(argv[1], 200, 20, 20, BLACK);
+
+			DrawText("Amplitudes", 15, 70, 20, BLACK);
 
 
             //Vector2 points[5] = {{3.1f, 310.2f}, {20.2f, 310.7f}, {30.3f, 310.8f}, {40.4f, 310.08f}, {50.5f, 310.0f}};
@@ -117,7 +125,7 @@ int main(void) {
 
             DrawSplineBezierCubic(normalized_freuquency_graph, new_len, 1.0f, BLUE);
 
-			DrawText("Frequencies", 400, 20, 20, BLACK);
+			DrawText("Frequencies", 415, 70, 20, BLACK);
 			//DrawLineBezier....
 		EndDrawing();
 	}
