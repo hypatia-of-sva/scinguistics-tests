@@ -20,7 +20,6 @@ typedef struct {
    diagram_t base_diagram;
    size_t nr_formants;
    float* formants;
-   bool* should_be_drawn;
 } formant_diagram_t;
 
 typedef struct {
@@ -130,21 +129,11 @@ window_state_t create_state(waveform_t snippet, int frequency_display_reduction_
        reduced_amplitudes[i] = normalized_amplitudes[i*reduction_factor];
    }
 
+
+
    matrix_t values, bandwidths;
    size_t nr_formants = 2+(testform.samples_per_second/1000);
    find_formants(testform, nr_formants, &values, &bandwidths, true);
-
-   Vector2* normalized_amplitude_graph = create_graph_from_float_array(reduced_amplitudes, reduced_length, 15.0f, 350.0f, 350.0f, 200.0f);
-
-   float base_x = 415.0f, base_y = 550.0f, max_x = 350.0f, max_y = 400.0f;
-   Vector2* normalized_freuquency_graph = malloc(len*sizeof(Vector2));
-   for(int i = 0; i < len; i++) {
-       float frequency_in_herz = freq * (((float)i)/((float) len));
-       float octave = log2(frequency_in_herz/27.5);
-       float x_value = octave/10;
-       normalized_freuquency_graph[i].x = base_x + max_x*x_value;
-       normalized_freuquency_graph[i].y = base_y - max_y*normalized_frequencies[i];
-   }
 
    float* formant_frequencies = calloc(nr_formants, sizeof(float));
    for(int i = 0; i < nr_formants; i++) {
@@ -171,11 +160,39 @@ window_state_t create_state(waveform_t snippet, int frequency_display_reduction_
        //printf("Is the %i-th formant %f > the average (%f): %i\n", i, formant_frequencies[i], average, shoud_be_drawn[i]);
    }
 
+   size_t actual_nr_formants = 0;
+   float* formant_array = calloc(nr_formants, sizeof(float));
+   for(int i = 0; i < nr_formants; i++) {
+      if(should_be_drawn[i]) {
+         forman_array[actual_nr_formants] = formant_frequencies[i];
+         actual_nr_formants++;
+      }
+   }
+   
+
+
+   Vector2* normalized_amplitude_graph = create_graph_from_float_array(reduced_amplitudes, reduced_length, 15.0f, 350.0f, 350.0f, 200.0f);
+   diagram_t amplitude = {15.0f, 350.0f, 350.0f, 200.0f, reduced_length, normalized_amplitude_graph, 1.0f, BLUE};
+
+   float base_x = 415.0f, base_y = 550.0f, max_x = 350.0f, max_y = 400.0f;
+   Vector2* normalized_freuquency_graph = malloc(len*sizeof(Vector2));
+   for(int i = 0; i < len; i++) {
+       float frequency_in_herz = freq * (((float)i)/((float) len));
+       float octave = log2(frequency_in_herz/27.5);
+       float x_value = octave/10;
+       normalized_freuquency_graph[i].x = base_x + max_x*x_value;
+       normalized_freuquency_graph[i].y = base_y - max_y*normalized_frequencies[i];
+   }
+   formant_diagram_t log_freq = {{base_x, base_y, max_x, max_y, len/2, normalized_frequency_graph, 1.0f, BLUE},
+      actual_nr_formants, formant_array};
+
+
 
    /* second linar graph */
    float lin_base_x = 850.0f;
    Vector2* normalized_linear_freuquency_graph = create_graph_from_float_array(normalized_frequencies, (len >> frequency_display_reduction_power), lin_base_x, base_y, max_x, max_y);
-
+   formant_diagram_t lin_freq = {{lin_base_x, base_y, max_x, max_y, (len >> frequency_display_reduction_power),
+      normalized_linear_frequency_graph, 1.0f, BLUE}, actual_nr_formants, formant_array};
 
 
 	window_state_t state;
@@ -193,7 +210,14 @@ window_state_t create_state(waveform_t snippet, int frequency_display_reduction_
    };
    memmove(state.strings, stack_strings, sizeof(stack_strings));
    
+
    
+   state.amplitude = amplitude;
+   state.log_frequency = log_freq;
+   state.linear_frequency = lin_freq;
+   
+   
+   return state;
 }
 
 int main(int argc, char** argv) {
