@@ -22,7 +22,17 @@ typedef struct {
    float* formants;
    bool* should_be_drawn;
 } formant_diagram_t;
+
 typedef struct {
+	char* text;
+   int x, y, size;
+   Color color;
+} display_string_t;
+
+typedef struct {
+	size_t nr_strings;
+	display_string_t* strings;
+
    char* path;
    char duration_string[40];
    char max_amplitude_string[80];
@@ -44,84 +54,50 @@ void draw_formant_diagram(formant_diagram_t dia) {
    draw_diagram(dia.base_diagram);
 
    for(int i = 0; i < dia.nr_formants; i++) {
-           float x_param = log2(dia.formants[i]/27.5)/10;
-           dash[0].x = base_x + max_x*x_param;
-           dash[0].y = base_y;
-           dash[1].x = base_x + max_x*x_param;
-           dash[1].y = base_y + 50.0f;
-           DrawSplineLinear(dash, 2, 1.0f, BLUE);
-           if(i != 0) {
-           }
-   }
-   for(int i = 0; i < dia.nr_formants-1; i++) {
-       if(dia.should_be_drawn[i])
-           DrawSplineLinear(dia.mid_formant_dashes[i], 2, 1.0f, GREEN);
+   	float x_param = log2(dia.formants[i]/27.5)/10;
+      dash[0].x = base_x + max_x*x_param;
+      dash[0].y = base_y;
+      dash[1].x = base_x + max_x*x_param;
+      dash[1].y = base_y + 50.0f;
+      DrawSplineLinear(dash, 2, 1.0f, BLUE);
+      if(i != 0) {
+           float mid_freq = (dia.formants[i-1] + dia.formants[i])/2;
+           float x_param2 = log2(mid_freq/27.5)/10;
+           dash[i][0].x = base_x + max_x*x_param2;
+           dash[i][0].y = base_y - max_y - 50.0f;
+           dash[i][1].x = base_x + max_x*x_param2;
+           dash[i][1].y = base_y;
+			  DrawSplineLinear(dash, 2, 1.0f, GREEN);
+   	}
    }
 
    for(int i = 0; i < 11; i++) {
-       DrawSplineLinear(dia.a_dashes[i], 2, 1.0f, RED);
-       char label[100];
-       snprintf(label, 100, "A%i", i);
-       DrawText(label, floor(dia.a_dashes[i][1].x - max_x*0.05), floor(a_dashes[i][1].y+5), 20, BLACK);
+       dashes[0].x = base_x + max_x*(i*0.1);
+       dashes[0].y = base_y;
+       dashes[1].x = base_x + max_x*(i*0.1);
+       dashes[1].y = base_y + 50.0f;
+       DrawSplineLinear(dash, 2, 1.0f, RED);
+       char label[4];
+       snprintf(label, 4, "A%i", i);
+       DrawText(label, floor(dash[1].x - max_x*0.05), floor(dash[1].y+5), 20, BLACK);
    }
 
 }
 
+void draw_string(display_string_t s) {
+   DrawText(s.text, s.x, s.y, s.size, s.color);
+} 
 
 void render(window_state_t state) {
-
    BeginDrawing();
        ClearBackground(RAYWHITE);
-
-       DrawText("Analyzing File: ", 15, 20, 20, BLACK);
-       DrawText(state.path, 200, 20, 20, BLACK);
-       DrawText(state.duration_string, 415, 20, 20, BLACK);
-
-
-       DrawText("Amplitudes", 15, 70, 20, BLACK);
-       DrawText("Frequencies", 415, 70, 20, BLACK);
-       DrawText(state.max_amplitude_string, 15, 90, 20, BLACK);
-       DrawText(state.max_frequency_string, 415, 90, 20, BLACK);
-       DrawSplineLinear(state.amplitude.data, state.amplitude.nr_of_points, 1.0f, BLUE);
-       DrawSplineLinear(state.log_frequency.data, state.log_frequency.nr_of_points, 1.0f, BLUE);
-
-
-       for(int i = 0; i < nr_formants; i++) {
-           if(shoud_be_drawn[i])
-               DrawSplineLinear(formant_dashes[i], 2, 1.0f, BLUE);
-       }
-       for(int i = 0; i < nr_formants-1; i++) {
-           if(shoud_be_drawn[i])
-               DrawSplineLinear(mid_formant_dashes[i], 2, 1.0f, GREEN);
-       }
-
-       for(int i = 0; i < 11; i++) {
-           DrawSplineLinear(a_dashes[i], 2, 1.0f, RED);
-           char label[100];
-           snprintf(label, 100, "A%i", i);
-           DrawText(label, floor(a_dashes[i][1].x - max_x*0.05), floor(a_dashes[i][1].y+5), 20, BLACK);
-       }
-
-
-
-       DrawSplineLinear(normalized_linear_freuquency_graph, (new_len >> frequency_display_reduction_power), 1.0f, BLUE);
-
-
-       DrawText("Linear Frequencies", 865, 70, 20, BLACK);
-       for(int i = 0; i < nr_formants; i++) {
-           if(shoud_be_drawn[i] == 1)
-           DrawSplineLinear(lin_formant_dashes[i], 2, 1.0f, BLUE);
-       }
-
-       for(int i = 0; i < 11; i++) {
-           DrawSplineLinear(lin_a_dashes[i], 2, 1.0f, RED);
-           char label[100];
-           snprintf(label, 100, "A%i", i);
-           DrawText(label, floor(lin_a_dashes[i][1].x - max_x*0.05), floor(lin_a_dashes[i][1].y+5), 20, BLACK);
-       }
-
+		for(int i = 0; i < state.nr_strings; i++) {
+         draw_string(state.strings[i]);
+      }
+		draw_diagram(state.amplitude);
+      draw_formant_diagram(state.log_frequency);
+      draw_formant_diagram(state.linear_frequency);
    EndDrawing();
-
 }
 
 
