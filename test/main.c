@@ -33,12 +33,6 @@ typedef struct {
 	size_t nr_strings;
 	display_string_t* strings;
 
-   char* path;
-   char duration_string[40];
-   char max_amplitude_string[80];
-   char max_frequency_string[80];
-   char duration_string[40];
-
    diagram_t amplitude;
    formant_diagram_t log_frequency;
    formant_diagram_t linear_frequency;
@@ -100,7 +94,107 @@ void render(window_state_t state) {
    EndDrawing();
 }
 
+window_state_t create_state(waveform_t snippet, int frequency_display_reduction_power, const char* snippet_name) {
+   size_t len = snippet.data_length;
+   float freq = ((float)snippet.samples_per_second);
+   
+   if(!power_pf_two(len)) die("Data size collected not power of two!");
+   
+   float* amplitudes = transform_to_complex_array(snippet.amplitude_data, len);
+   float* frequencies = fft_power_of_two(amplitudes, len*2);
+   float* combined_frequencies = compute_complex_absolute_values(frequencies, len);
+   float* normalized_amplitudes = normalize_int_array(snippet.amplitude_data, len);
+   float* normalized_frequencies = normalize_float_array(combined_frequencies, len);
 
+   int16_t max_abs_amplitude = 0;
+   int max_amp_index = 0;
+   maximum_abs_value_and_position_int_array(snippet.amplitude_data, len, &max_amp_index, &max_abs_amplitude);
+   char* max_amplitude_string = malloc(80);
+   snprintf(max_amplitude_string, 80, "Maximum Amplitude: %.6f \n(index %i)", (float) max_abs_amplitude, max_amp_index);
+
+   float max_combined_freq = 0.0f;
+   int max_freq_index = 0;
+   maximum_abs_value_and_position_float_array(frequencies, len, &max_freq_index, &max_combined_freq);
+   char* max_frequency_string = malloc(80);
+   snprintf(max_frequency_string, 80, "Maximum Frequency: %.6f \n(index %i)", max_combined_freq, max_freq_index);
+
+   char* duration_string = malloc(40);
+   float actual_play_duration = duration(snippet);
+   snprintf(duration_string, 40, "Duration: %.6fs\nSamples/s: %i", actual_play_duration, snippet.samples_per_second);
+
+   int reduced_length = (len > 4096 ? 4096 : len);
+   int reduction_factor = len/reduced_length;
+
+   float* reduced_amplitudes = malloc(reduced_length*sizeof(float));
+   for(int i = 0; i < reduced_length; i++) {
+       reduced_amplitudes[i] = normalized_amplitudes[i*reduction_factor];
+   }
+
+   matrix_t values, bandwidths;
+   size_t nr_formants = 2+(testform.samples_per_second/1000);
+   find_formants(testform, nr_formants, &values, &bandwidths, true);
+
+   Vector2* normalized_amplitude_graph = create_graph_from_float_array(reduced_amplitudes, reduced_length, 15.0f, 350.0f, 350.0f, 200.0f);
+
+   float base_x = 415.0f, base_y = 550.0f, max_x = 350.0f, max_y = 400.0f;
+   Vector2* normalized_freuquency_graph = malloc(len*sizeof(Vector2));
+   for(int i = 0; i < len; i++) {
+       float frequency_in_herz = freq * (((float)i)/((float) len));
+       float octave = log2(frequency_in_herz/27.5);
+       float x_value = octave/10;
+       normalized_freuquency_graph[i].x = base_x + max_x*x_value;
+       normalized_freuquency_graph[i].y = base_y - max_y*normalized_frequencies[i];
+   }
+
+   float* formant_frequencies = calloc(nr_formants, sizeof(float));
+   for(int i = 0; i < nr_formants; i++) {
+       formant_frequencies[i] = get(values, 0, i);
+   }
+   quick_sort_float(formant_frequencies, nr_formants);
+
+   size_t* search_indices = calloc(nr_formants, sizeof(size_t));
+   for(int i = 0; i < nr_formants; i++) {
+       search_indices[i] =  floor(((float)len)*(formant_frequencies[i]/freq));
+   }
+
+   bool* should_be_drawn = calloc(nr_formants, sizeof(bool));
+   for(int i = 0; i < nr_formants; i++) {
+       size_t min_index = (i == 0 ? 0 : search_indices[i-1]), max_index = (i == nr_formants-1 ? len/2 : search_indices[i+1]);
+       size_t nr_of_indices = 0;
+       float total = 0.0f;
+       for(size_t index = min_index; index < max_index; index++) {
+           nr_of_indices++;
+           total += normalized_frequencies[index];
+       }
+       float average = total / nr_of_indices;
+       should_be_drawn[i] = 1 + normalized_frequencies[search_indices[i]] > average;
+       //printf("Is the %i-th formant %f > the average (%f): %i\n", i, formant_frequencies[i], average, shoud_be_drawn[i]);
+   }
+
+
+   /* second linar graph */
+   float lin_base_x = 850.0f;
+   Vector2* normalized_linear_freuquency_graph = create_graph_from_float_array(normalized_frequencies, (len >> frequency_display_reduction_power), lin_base_x, base_y, max_x, max_y);
+
+
+
+	window_state_t state;
+   state.nr_strings = 8;
+   state.strings = calloc(8,sizeof(display_string_t));
+	display_string_t stack_strings[8] = {   
+           {"Analyzing Snippet: ", 15, 20, 20, BLACK},
+           {snippet_name, 200, 20, 20, BLACK},
+           {duration_string, 415, 20, 20, BLACK},
+           {"Amplitudes", 15, 70, 20, BLACK},
+           {"Frequencies", 415, 70, 20, BLACK},
+           {max_amplitude_string, 15, 90, 20, BLACK},
+           {max_frequency_string, 415, 90, 20, BLACK},
+           {"Linear Frequencies", 865, 70, 20, BLACK}
+   };
+   memmove(state.strings, stack_strings, sizeof(stack_strings));
+   
+   
+}
 
 int main(int argc, char** argv) {
 
